@@ -68,7 +68,13 @@ def main() -> None:
         diff = "" if args.path else get_file_diff(file_path)
 
         prompt = build_prompt(diff, full_code, rules, file_path)
-        response = call_llm(prompt)
+
+        try:
+            response = call_llm(prompt)
+        except RuntimeError as exc:
+            print(f"❌ Erro na análise de '{file_path}': {exc}")
+            continue
+
         report_path = save_report(response, file_path)
         print(f"📄 Relatório salvo em: {report_path}")
         apply_fix(response, file_path)

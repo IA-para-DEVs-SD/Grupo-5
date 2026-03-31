@@ -300,12 +300,17 @@ def call_llm(prompt: str) -> str:
         return _get_mock_response(prompt)
 
     # Envia o prompt via stdin para evitar limite de tamanho de argumento
-    result = subprocess.run(
-        ["kiro-cli", "chat", "--no-interactive", "--trust-tools="],
-        input=prompt,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["kiro-cli", "chat", "--no-interactive", "--trust-tools="],
+            input=prompt,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("Timeout: kiro-cli não respondeu em 120 segundos.")
+
     if result.returncode != 0:
         raise RuntimeError(f"Erro ao chamar kiro-cli: {result.stderr}")
     return _strip_ansi(result.stdout.strip())

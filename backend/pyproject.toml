@@ -21,6 +21,15 @@ line-length = 99
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "N"]
 
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --tb=short"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src*"]
