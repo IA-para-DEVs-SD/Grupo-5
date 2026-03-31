@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependências
+        run: pip install -e ".[dev]"
+        working-directory: backend
+
+      - name: Ruff lint
+        run: ruff check .
+        working-directory: backend
+
+      - name: Ruff format
+        run: ruff format --check .
+        working-directory: backend
+
+      - name: Testes
+        run: python -m pytest tests/ -v
+        working-directory: backend
