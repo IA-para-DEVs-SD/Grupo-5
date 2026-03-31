@@ -1,8 +1,11 @@
 """Testes de integração do KiroSonar com projetos JavaScript."""
 
 import os
+import shutil
 import subprocess
 from pathlib import Path
+
+import pytest
 
 JS_PROJECT_PATH = Path(__file__).parent / "js-project" / "src"
 BACKEND_PATH = Path(__file__).parent.parent
@@ -23,8 +26,10 @@ def run_kirosonar_analyze(file_path: str) -> tuple[str, int]:
         for old_report in REPORTS_PATH.glob("*.md"):
             old_report.unlink()
 
-    # Usa o comando kirosonar do venv
-    kirosonar_cmd = BACKEND_PATH / ".venv" / "bin" / "kirosonar"
+    # Encontra o comando kirosonar no PATH (venv, conda, ou instalação global)
+    kirosonar_cmd = shutil.which("kirosonar")
+    if not kirosonar_cmd:
+        kirosonar_cmd = str(BACKEND_PATH / ".venv" / "bin" / "kirosonar")
 
     # Garante que ~/.local/bin está no PATH (onde kiro-cli está instalado)
     env = os.environ.copy()
@@ -32,7 +37,7 @@ def run_kirosonar_analyze(file_path: str) -> tuple[str, int]:
     env["PATH"] = f"{local_bin}:{env.get('PATH', '')}"
 
     result = subprocess.run(
-        [str(kirosonar_cmd), "analyze", "--path", file_path],
+        [kirosonar_cmd, "analyze", "--path", file_path],
         capture_output=True,
         text=True,
         cwd=BACKEND_PATH,
@@ -52,6 +57,7 @@ def run_kirosonar_analyze(file_path: str) -> tuple[str, int]:
     return report_content, result.returncode
 
 
+@pytest.mark.integration
 class TestDetection:
     """Integration tests for error detection."""
 
