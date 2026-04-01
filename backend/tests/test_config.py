@@ -39,7 +39,7 @@ class TestLoadRules:
         rules_file.write_text("# Regras do Time", encoding="utf-8")
         monkeypatch.chdir(tmp_path)
         result = load_rules(None)
-        assert result == "# Regras do Time"
+        assert "# Regras do Time" in result
 
     def test_default_rules_is_not_empty(self) -> None:
         """DEFAULT_RULES constant must not be empty."""

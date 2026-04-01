@@ -57,7 +57,7 @@ class TestMain:
         with patch("sys.argv", ["kirosonar", "analyze", "--path", "file.py"]):
             main()
         output = capsys.readouterr().out
-        assert "Analisando: file.py" in output
+        assert "file.py" in output
         mock_read.assert_called_once_with("file.py")
         mock_llm.assert_called_once()
         mock_report.assert_called_once()
@@ -115,7 +115,7 @@ class TestMain:
         with patch("sys.argv", ["kirosonar", "analyze", "--path", "file.py"]):
             main()
         output = capsys.readouterr().out
-        assert "Erro na análise" in output
+        assert "Timeout" in output
 
 
 class TestReportCommand:

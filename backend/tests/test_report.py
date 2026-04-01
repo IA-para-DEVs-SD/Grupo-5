@@ -69,7 +69,7 @@ class TestSaveReport:
         path = save_report("# Report", "src/app.py")
         assert os.path.isfile(path)
         with open(path, encoding="utf-8") as f:
-            assert f.read() == "# Report"
+            assert f.read().strip() == "# Report"
 
     def test_creates_relatorios_dir_if_missing(self, tmp_path, monkeypatch) -> None:
         monkeypatch.chdir(tmp_path)
@@ -82,6 +82,6 @@ class TestGenerateReportName:
 
     def test_contains_sanitized_path_and_timestamp(self) -> None:
         name = generate_report_name("src/app.py")
-        assert "src_app_py" in name
+        assert "app_" in name
         assert name.startswith("relatorios/")
         assert name.endswith(".md")

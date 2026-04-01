@@ -15,6 +15,7 @@ meu-projeto/
 ├── Dockerfile              # Opcional: Imagem Docker
 ├── docker-compose.yml      # Opcional: Orquestração para rodar local
 └── README.md               # Documentação inicial do projeto
+└── regras_empresa.example.md # Template de regras de análise
 └── .gitignore              # Ignora arquivos e pastas no versionamento
 ```
 

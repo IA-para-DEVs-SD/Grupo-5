@@ -31,12 +31,13 @@ flowchart TD
 ```
 backend/src/
 ├── cli.py            # Ponto de entrada, orquestra o fluxo completo
-├── config.py         # Carrega regras de análise (arquivo ou default)
+├── config.py         # Carrega regras de análise (arquivo, specs ou default)
 ├── git_module.py     # Integração com Git (diff, arquivos alterados)
-├── ai_service.py     # Chamada à LLM via kiro-cli (subprocess)
+├── ai_service.py     # Chamada à LLM via kiro-cli (subprocess + barra de progresso)
 ├── prompt_builder.py # Montagem do prompt estruturado para a LLM
 ├── report.py         # Geração e salvamento de relatórios Markdown
-└── autofix.py        # Extração e aplicação do código refatorado
+├── autofix.py        # Extração e aplicação do código refatorado
+└── chunker.py        # Divisão de arquivos grandes em trechos por função/classe
 ```
 
 ---
@@ -94,11 +95,35 @@ kirosonar analyze --path src/meu_arquivo.py
 
 # Especifica um arquivo de regras customizado
 kirosonar analyze --rules caminho/para/regras.md
+
+# Cria regras_empresa.md a partir do template (se não houver specs no projeto)
+kirosonar init
+
+# Lista os relatórios gerados
+kirosonar report
 ```
 
 ### Regras Personalizadas
 
-Crie um arquivo `regras_empresa.md` na raiz do seu projeto com as diretrizes de código do seu time. O KiroSonar lerá esse arquivo automaticamente e usará as regras para avaliar o código. Caso o arquivo não exista, regras padrão serão utilizadas.
+O KiroSonar detecta regras de análise automaticamente nesta ordem de prioridade:
+
+1. `--rules caminho` (flag explícita, sempre vence)
+2. `regras_empresa.md` na raiz do projeto
+3. Specs de IA existentes (`.kiro/instructions.md`, `.cursor/rules`, `.github/copilot-instructions.md`)
+4. `DEFAULT_RULES` (fallback com regras genéricas)
+
+O repositório inclui um template de regras em `regras_empresa.example.md` com seções de Padrões de Código, Nomenclatura, Arquitetura e Segurança. Para usar:
+
+```bash
+# Copie o template e adapte às convenções do seu time
+cp regras_empresa.example.md regras_empresa.md
+```
+
+Ou use o comando `init` que cria o arquivo automaticamente (se não houver specs no projeto):
+
+```bash
+kirosonar init
+```
 
 ---
 
@@ -124,9 +149,10 @@ cp backend/.env.example backend/.env
 2. O módulo `git_module` descobre arquivos alterados via `git diff --name-only`
 3. Para cada arquivo, captura o diff e o conteúdo completo
 4. O `prompt_builder` monta um prompt estruturado com diff (peso máximo), código completo (peso médio) e regras da empresa
-5. O `ai_service` envia o prompt para a LLM via `kiro-cli` (subprocess com timeout de 120s)
-6. A resposta é salva como relatório Markdown em `/relatorios`
-7. O `autofix` extrai código refatorado (entre tags `[START]`/`[END]`) e oferece aplicação interativa
+5. Arquivos grandes sem diff (>300 linhas) são divididos em trechos pelo `chunker` e analisados em paralelo
+6. O `ai_service` envia o prompt para a LLM via `kiro-cli` (subprocess com timeout de 120s e barra de progresso)
+7. A resposta é salva como relatório Markdown em `/relatorios`
+8. O `autofix` extrai código refatorado (entre tags `[START]`/`[END]`) e oferece aplicação interativa
 
 ---
 
