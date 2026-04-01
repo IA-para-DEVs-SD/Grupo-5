@@ -1,5 +1,8 @@
 """Unit tests for src.prompt_builder module."""
 
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
 from src.prompt_builder import _sanitize_user_content, build_prompt
 
 
@@ -25,19 +28,11 @@ class TestBuildPrompt:
 
     def test_includes_diff_section_when_diff_provided(self) -> None:
         result = build_prompt("@@ -1 +1 @@", "code", "rules", "f.py")
-        assert "PESO MÁXIMO" in result
+        assert "FOCO PRINCIPAL" in result
 
     def test_excludes_diff_section_when_empty(self) -> None:
         result = build_prompt("", "code", "rules", "f.py")
-        assert "PESO MÁXIMO" not in result
-from hypothesis import given, settings
-from hypothesis import strategies as st
-
-from src.prompt_builder import build_prompt
-
-
-class TestBuildPrompt:
-    """Tests for build_prompt."""
+        assert "FOCO PRINCIPAL" not in result
 
     def test_contains_file_path(self) -> None:
         result = build_prompt("", "code", "rules", "src/app.py")
@@ -62,7 +57,14 @@ class TestBuildPrompt:
 
     def test_contains_response_template_sections(self) -> None:
         result = build_prompt("", "code", "rules", "app.py")
-        for section in ["## Bugs", "## Vulnerabilidades", "## Code Smells", "## Hotspots de Segurança", "## Código Refatorado"]:
+        sections = [
+            "## 🐞 Bugs",
+            "## 🔐 Segurança",
+            "## 🧹 Code Smells",
+            "## ⚡ Performance",
+            "## ⚠️ Security Hotspots",
+        ]
+        for section in sections:
             assert section in result
 
     def test_contains_start_end_tags_in_template(self) -> None:

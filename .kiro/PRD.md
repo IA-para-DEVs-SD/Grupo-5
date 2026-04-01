@@ -30,8 +30,9 @@ Uma CLI (`kirosonar`) que:
 
 1. Detecta automaticamente os arquivos alterados via `git diff`.
 2. Envia o código para uma LLM junto com as regras de qualidade do time.
-3. Gera um relatório estruturado (Bugs, Vulnerabilidades, Code Smells, Hotspots).
+3. Gera um relatório estruturado (Bugs, Segurança, Code Smells, Performance, Security Hotspots).
 4. Oferece ao desenvolvedor a opção de aplicar o Auto-Fix com aprovação explícita.
+5. Divide arquivos grandes em trechos e analisa em paralelo para otimizar tempo.
 
 ---
 
@@ -53,7 +54,7 @@ Uma CLI (`kirosonar`) que:
   - **Diff (peso máximo):** as alterações recentes ainda não comitadas, obtidas via `git diff <arquivo>`. Esta seção recebe prioridade máxima na análise — é o foco principal do review.
   - **Arquivo completo (peso médio):** o conteúdo integral do arquivo, fornecido como contexto para que a IA compreenda o impacto das mudanças no todo. Esta seção tem peso secundário na análise.
 - A separação entre diff e arquivo completo deve ser explícita no prompt, com instruções claras de ponderação para a LLM.
-- Um relatório em Markdown é gerado em `relatorios/` com as seções: Bugs, Vulnerabilidades, Code Smells e Hotspots de Segurança.
+- Um relatório em Markdown é gerado em `relatorios/` com as seções: Bugs, Segurança, Code Smells, Performance e Security Hotspots.
 - Se não houver arquivos alterados, exibe "Nenhum arquivo alterado encontrado." e encerra sem erro.
 - Se o diretório não for um repositório Git, exibe mensagem de erro e encerra com código 1.
 - O usuário pode analisar um arquivo específico via `--path src/arquivo.py`, ignorando o git diff.
@@ -67,10 +68,11 @@ Uma CLI (`kirosonar`) que:
 - O arquivo original só é alterado após confirmação explícita — nunca automaticamente.
 
 ### RF-03: Regras de Análise Personalizáveis
+- O repositório inclui um template `regras_empresa.example.md` com seções de Padrões de Código, Nomenclatura, Arquitetura e Segurança.
 - Se existir `regras_empresa.md` na raiz do projeto, o sistema carrega seu conteúdo e injeta no prompt enviado à LLM.
 - Se o arquivo não existir, o sistema utiliza `DEFAULT_RULES` como fallback, sem interromper a execução.
 - O usuário pode especificar um caminho alternativo via `--rules <caminho>`.
-- As regras são escritas em linguagem natural (Markdown).
+- As regras são escritas em linguagem natural (Markdown), em português Brasil.
 - As `DEFAULT_RULES` cobrem: SOLID, naming, complexidade, type hints, DRY, docstrings.
 
 ---
@@ -105,13 +107,14 @@ Uma CLI (`kirosonar`) que:
 
 | Módulo | Responsabilidade |
 |---|---|
-| `src/cli.py` | Orquestração do fluxo e parsing de argumentos (`argparse`) |
-| `src/git_module.py` | Execução do `git diff --name-only`, captura do diff por arquivo (`git diff <arquivo>`) e leitura do conteúdo completo |
-| `src/config.py` | Carregamento das regras de análise ou fallback para `DEFAULT_RULES` |
+| `src/cli.py` | Orquestração do fluxo, parsing de argumentos, processamento paralelo |
+| `src/git_module.py` | Execução do `git diff --name-only`, captura do diff por arquivo e leitura do conteúdo completo |
+| `src/config.py` | Carregamento de regras (specs de IA, `regras_empresa.md` ou `DEFAULT_RULES`) |
 | `src/prompt_builder.py` | Montagem do prompt com diff (peso máximo) + arquivo completo (peso médio) + regras |
-| `src/ai_service.py` | Envio do prompt à LLM |
-| `src/report.py` | Persistência do relatório em `/relatorios` |
+| `src/ai_service.py` | Envio do prompt à LLM com barra de progresso |
+| `src/report.py` | Persistência do relatório em `/relatorios` com limpeza de artefatos do kiro-cli |
 | `src/autofix.py` | Extração do código refatorado e aplicação com confirmação interativa |
+| `src/chunker.py` | Divisão de arquivos grandes em trechos por fronteiras de função/classe com overlap |
 
 ---
 
@@ -120,19 +123,24 @@ Uma CLI (`kirosonar`) que:
 ```
 kirosonar analyze [--path arquivo] [--rules regras.md]
     → verifica versão Python (>= 3.11)
+    → verifica kiro-cli no PATH
     → git diff --name-only  (ou usa --path)
-    → load_rules()          (regras_empresa.md ou DEFAULT_RULES)
+    → load_rules()          (specs de IA, regras_empresa.md ou DEFAULT_RULES)
     → para cada arquivo:
-        → git diff <arquivo>        → diff das alterações não comitadas (peso máximo)
-        → read_file_content()       → conteúdo completo do arquivo (peso médio)
-        → build_prompt(diff, full_code, rules, file_path)
-        → call_llm(prompt)
+        → git diff <arquivo>        → diff (sempre tentado, mesmo com --path)
+        → read_file_content()       → conteúdo completo do arquivo
+        → se arquivo grande (>300 linhas) e sem diff:
+            → chunker divide em trechos por função/classe
+            → analisa trechos em paralelo (ThreadPoolExecutor)
+        → senão:
+            → build_prompt(diff, full_code, rules, file_path)
+            → call_llm(prompt) com barra de progresso
         → save_report(response, file_path)  → relatorios/
         → extract_refactored_code(response)
             → se encontrou [START]...[END]:
                 → exibe preview (20 linhas)
                 → "Deseja aplicar o fix? (s/n)"
-                → se 's': sobrescreve arquivo
+                → se 's': backup .bak + sobrescreve arquivo
 ```
 
 ---
@@ -142,12 +150,16 @@ kirosonar analyze [--path arquivo] [--rules regras.md]
 - [ ] `kirosonar analyze` executa sem o prefixo `python`.
 - [ ] Arquivos alterados são detectados automaticamente via `git diff`.
 - [ ] O prompt enviado à LLM contém o diff (peso máximo) e o arquivo completo (peso médio) de forma separada e explicitamente ponderada.
-- [ ] Relatório gerado em `relatorios/` com as 4 seções (Bugs, Vulnerabilidades, Code Smells, Hotspots).
+- [ ] Relatório gerado em `relatorios/` com 5 seções (Bugs, Segurança, Code Smells, Performance, Security Hotspots).
 - [ ] Auto-Fix só é aplicado após confirmação explícita do usuário.
-- [ ] Regras customizadas via `regras_empresa.md` são injetadas no prompt.
-- [ ] Fallback para `DEFAULT_RULES` quando o arquivo de regras não existe.
-- [ ] Mensagens de erro claras para repositório Git inválido ou ausência de arquivos alterados.
+- [ ] Regras customizadas via `regras_empresa.md` ou specs de IA são injetadas no prompt.
+- [ ] Fallback para `DEFAULT_RULES` quando nenhum arquivo de regras existe.
+- [ ] Mensagens de erro claras para repositório Git inválido, ausência de `kiro-cli` ou ausência de arquivos alterados.
 - [ ] Todos os módulos com Type Hinting e Docstrings.
+- [ ] Arquivos grandes (>300 linhas) sem diff são divididos em trechos e analisados em paralelo.
+- [ ] Barra de progresso durante a análise da LLM.
+- [ ] Comando `kirosonar init` cria `regras_empresa.md` a partir do template.
+- [ ] Comando `kirosonar report` lista relatórios gerados.
 
 ---
 

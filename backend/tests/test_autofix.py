@@ -1,8 +1,10 @@
 """Unit tests for src.autofix module."""
 
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from src.autofix import _validate_path, apply_fix, extract_refactored_code
 
@@ -18,14 +20,6 @@ class TestValidatePath:
     @patch("src.autofix.get_repo_root", return_value="/home/user/repo")
     def test_accepts_path_inside_repo(self, mock_root: MagicMock) -> None:
         _validate_path("/home/user/repo/src/app.py")
-import os
-from unittest.mock import mock_open, patch
-
-import pytest
-from hypothesis import given, settings
-from hypothesis import strategies as st
-
-from src.autofix import apply_fix, extract_refactored_code
 
 
 class TestExtractRefactoredCode:
@@ -43,24 +37,7 @@ class TestExtractRefactoredCode:
         response = "[START]\ndef foo():\n    return 1\n[END]"
         assert extract_refactored_code(response) == "def foo():\n    return 1"
 
-
-class TestApplyFix:
-    """Tests for apply_fix."""
-
-    @patch("builtins.input", return_value="s")
-    @patch("builtins.open", mock_open())
-    def test_applies_fix_when_user_accepts(self, mock_inp) -> None:
-        response = "[START]\nprint('fixed')\n[END]"
-        assert apply_fix(response, "file.py") is True
-
-    @patch("builtins.input", return_value="n")
-    def test_does_not_apply_when_user_declines(self, mock_inp) -> None:
-        response = "[START]\nprint('fixed')\n[END]"
-        assert apply_fix(response, "file.py") is False
-
-    def test_returns_false_when_no_refactored_code(self) -> None:
-        response = "## Bugs\n- Nenhum"
-        assert apply_fix(response, "file.py") is False
+    def test_extracts_code_from_full_response(self) -> None:
         response = "## Bugs\n- None\n\n## Código Refatorado\n[START]\ndef foo():\n    pass\n[END]"
         assert extract_refactored_code(response) == "def foo():\n    pass"
 
@@ -72,11 +49,6 @@ class TestApplyFix:
 
     def test_returns_none_when_only_end_tag(self) -> None:
         assert extract_refactored_code("def foo(): pass\n[END]") is None
-
-    def test_extracts_multiline_code(self) -> None:
-        code = "def foo():\n    x = 1\n    return x"
-        response = f"[START]\n{code}\n[END]"
-        assert extract_refactored_code(response) == code
 
     def test_returns_none_on_empty_string(self) -> None:
         assert extract_refactored_code("") is None
@@ -103,7 +75,9 @@ class TestApplyFix:
         assert result is False
         assert "Nenhum código refatorado" in capsys.readouterr().out
 
-    def test_returns_false_when_user_declines(self, tmp_path) -> None:
+    @patch("src.autofix.get_repo_root")
+    def test_returns_false_when_user_declines(self, mock_root, tmp_path) -> None:
+        mock_root.return_value = str(tmp_path)
         file = tmp_path / "app.py"
         file.write_text("old code")
         response = "[START]\nnew code\n[END]"
@@ -112,7 +86,9 @@ class TestApplyFix:
         assert result is False
         assert file.read_text() == "old code"
 
-    def test_applies_fix_and_creates_backup_when_user_confirms(self, tmp_path) -> None:
+    @patch("src.autofix.get_repo_root")
+    def test_applies_fix_and_creates_backup_when_user_confirms(self, mock_root, tmp_path) -> None:
+        mock_root.return_value = str(tmp_path)
         file = tmp_path / "app.py"
         file.write_text("old code")
         response = "[START]\nnew code\n[END]"
@@ -122,7 +98,9 @@ class TestApplyFix:
         assert file.read_text() == "new code"
         assert (tmp_path / "app.py.bak").read_text() == "old code"
 
-    def test_backup_file_created_before_overwrite(self, tmp_path) -> None:
+    @patch("src.autofix.get_repo_root")
+    def test_backup_file_created_before_overwrite(self, mock_root, tmp_path) -> None:
+        mock_root.return_value = str(tmp_path)
         file = tmp_path / "script.py"
         original = "original content"
         file.write_text(original)
@@ -133,7 +111,9 @@ class TestApplyFix:
         assert backup.exists()
         assert backup.read_text() == original
 
-    def test_prints_preview_before_asking(self, tmp_path, capsys) -> None:
+    @patch("src.autofix.get_repo_root")
+    def test_prints_preview_before_asking(self, mock_root, tmp_path, capsys) -> None:
+        mock_root.return_value = str(tmp_path)
         file = tmp_path / "app.py"
         file.write_text("x = 1")
         response = "[START]\ny = 2\n[END]"

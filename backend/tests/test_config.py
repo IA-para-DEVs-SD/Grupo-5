@@ -9,8 +9,9 @@ from src.config import DEFAULT_RULES, load_rules
 class TestLoadRules:
     """Tests for the load_rules function."""
 
-    def test_returns_default_rules_when_file_not_found(self) -> None:
+    def test_returns_default_rules_when_file_not_found(self, tmp_path, monkeypatch) -> None:
         """Should return DEFAULT_RULES when the given path does not exist."""
+        monkeypatch.chdir(tmp_path)
         result = load_rules("nonexistent_file.md")
         assert result == DEFAULT_RULES
 
@@ -39,7 +40,7 @@ class TestLoadRules:
         rules_file.write_text("# Regras do Time", encoding="utf-8")
         monkeypatch.chdir(tmp_path)
         result = load_rules(None)
-        assert result == "# Regras do Time"
+        assert "# Regras do Time" in result
 
     def test_default_rules_is_not_empty(self) -> None:
         """DEFAULT_RULES constant must not be empty."""

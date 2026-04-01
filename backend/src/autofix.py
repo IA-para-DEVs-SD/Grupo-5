@@ -22,6 +22,9 @@ def _validate_path(file_path: str) -> None:
 def extract_refactored_code(ai_response: str) -> str | None:
     """Extrai o código refatorado da resposta da LLM.
 
+    Remove tags de code block (```python, ```php, etc) que a LLM
+    pode incluir dentro do bloco [START]/[END].
+
     Args:
         ai_response: String Markdown completa retornada pela LLM.
 
@@ -29,11 +32,21 @@ def extract_refactored_code(ai_response: str) -> str | None:
         Código refatorado ou None se as tags não forem encontradas.
     """
     match = re.search(r"\[START\]\s*\n(.*?)\n\s*\[END\]", ai_response, re.DOTALL)
-    return match.group(1) if match else None
+    if not match:
+        return None
+    code = match.group(1)
+    # Remove tag de code block (```python, ```php, etc)
+    code = re.sub(r"^```\w*\s*\n?", "", code)
+    code = re.sub(r"\n?```\s*$", "", code)
+    # Remove nome de linguagem solto na primeira linha (python, php, js, etc)
+    code = re.sub(r"^(?:python|php|javascript|typescript|java|ruby|go|c|cpp)\s*\n", "", code)
+    return code
 
 
 def apply_fix(ai_response: str, file_path: str) -> bool:
     """Aplica o código refatorado ao arquivo original.
+
+    Usado apenas em análise completa (--path), não em fluxo de diff.
 
     Args:
         ai_response: String Markdown completa retornada pela LLM.

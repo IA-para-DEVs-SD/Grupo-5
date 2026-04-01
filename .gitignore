@@ -20,6 +20,9 @@ env/
 .pytest_cache/
 htmlcov/
 .coverage
+.hypothesis/
 
 # Project
 relatorios/
+regras_empresa.md
+*.bak
